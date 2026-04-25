@@ -1,0 +1,81 @@
+server:
+  port: 8004
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+
+spring:
+  application:
+    name: ja-upms
+  profiles:
+    active: @profiles.active@
+  jackson:
+    time-zone: Asia/Shanghai
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    encoding: UTF-8
+    validate-on-migrate: true
+    out-of-order: false
+    placeholder-replacement: false
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  is-read-header: true
+  is-read-cookie: false
+  is-read-body: false
+  is-write-header: false
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  is-log: false
+
+logging:
+  level:
+    root: info
+    org.redisson: warn
+    com.zaxxer.hikari: warn
+    org.hibernate: warn
+    net.junanw.upms: debug
+
+mybatis-flex:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: net.junanw.upms.**.model.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+  global-config:
+    logic-delete-column: deleted
+    logic-delete-value: 1
+    logic-not-delete-value: 0
+    version-column: version
+    key-type: snowflake
+    update-strategy: not_null
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  default-flat-param-object: true
+  override-with-generic-response: false

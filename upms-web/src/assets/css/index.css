@@ -1,0 +1,9 @@
+/* Tailwind CSS v4 入口（在 Vite 插件驱动下编译产出） */
+/* 作为辅助样式使用，主要用于布局 */
+@import 'tailwindcss';
+
+/* 配置暗色模式 - 使用class策略 */
+@variant dark (&:where(.dark, .dark *));
+
+@import './shadcn.css';
+@import './main.css';

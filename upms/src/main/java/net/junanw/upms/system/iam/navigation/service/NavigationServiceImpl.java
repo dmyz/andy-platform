@@ -1,0 +1,375 @@
+package net.junanw.upms.system.iam.navigation.service;
+
+import com.mybatisflex.core.query.QueryWrapper;
+import net.junanw.upms.foundation.shared.exception.BusinessException;
+import net.junanw.upms.foundation.shared.util.ServiceSupport;
+import net.junanw.upms.foundation.shared.id.IdGenerator;
+import net.junanw.upms.system.iam.permission.entity.PermissionEntity;
+import net.junanw.upms.system.iam.permission.mapper.PermissionMapper;
+import net.junanw.upms.system.iam.navigation.model.view.NavigationDetailView;
+import net.junanw.upms.system.iam.navigation.model.view.NavigationTreeItem;
+import net.junanw.upms.system.iam.navigation.entity.NavigationEntity;
+import net.junanw.upms.system.iam.navigation.entity.NavigationPermissionEntity;
+import net.junanw.upms.system.iam.navigation.mapper.NavigationPermissionMapper;
+import net.junanw.upms.system.iam.navigation.mapper.NavigationMapper;
+import net.junanw.upms.system.iam.role.model.view.RolePermissionItem;
+import org.springframework.context.annotation.Primary;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+/**
+ * NavigationServiceImpl 服务实现。
+ *
+ * <p>负责承接 Navigation 相关业务编排与规则落地。
+ */
+@Service
+@Primary
+public class NavigationServiceImpl extends ServiceSupport implements NavigationService {
+
+    private final NavigationMapper uiNavigationMapper;
+    private final NavigationPermissionMapper uiNavigationPermissionMapper;
+    private final PermissionMapper iamPermissionMapper;
+    private final IdGenerator idGenerator;
+
+    public NavigationServiceImpl(
+            NavigationMapper uiNavigationMapper,
+            NavigationPermissionMapper uiNavigationPermissionMapper,
+            PermissionMapper iamPermissionMapper,
+            IdGenerator idGenerator
+    ) {
+        this.uiNavigationMapper = uiNavigationMapper;
+        this.uiNavigationPermissionMapper = uiNavigationPermissionMapper;
+        this.iamPermissionMapper = iamPermissionMapper;
+        this.idGenerator = idGenerator;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    /**
+     * 构建导航树。
+     *
+     * <p>按父子关系组装导航层级，并按排序号与主键稳定排序。
+     */
+    public List<NavigationTreeItem> tree() {
+        List<NavigationEntity> entities = uiNavigationMapper.selectListByQuery(
+                QueryWrapper.create()
+                        .where("deleted = false")
+                        .orderBy("sort_order", true)
+                        .orderBy("updated_at", true)
+        );
+        Map<Long, List<NavigationEntity>> childrenMap = new HashMap<>();
+        entities.forEach(item -> childrenMap.computeIfAbsent(item.getParentId(), ignored -> new ArrayList<>()).add(item));
+        childrenMap.values().forEach(list -> list.sort(Comparator.comparing(NavigationEntity::getSortOrder).thenComparing(NavigationEntity::getId)));
+        return childrenMap.getOrDefault(null, List.of()).stream().map(item -> toTree(item, childrenMap)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    /**
+     * 查询导航详情。
+     */
+    public NavigationDetailView detail(String id) {
+        return toDetail(require(parseId(id, "导航不存在")));
+    }
+
+    @Override
+    @Transactional
+    /**
+     * 创建导航。
+     *
+     * <p>创建前会校验导航类型与父子层级规则，再生成导航编码并落库。
+     */
+    public NavigationDetailView create(String parentId, String name, String type, String routePath, String componentPath, String externalUrl, String icon, Integer sortOrder, Boolean visible, Integer status) {
+        NavigationEntity parent = parentId == null || parentId.isBlank() ? null : require(parseId(parentId, "上级导航不存在"));
+        validatePayload(parent, type, routePath, componentPath, externalUrl, sortOrder, visible, status);
+        NavigationEntity entity = new NavigationEntity();
+        entity.setId(idGenerator.nextId());
+        entity.setDeleted(false);
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(LocalDateTime.now());
+        fill(entity, parent, name, type, routePath, componentPath, externalUrl, icon, sortOrder, visible, status);
+        uiNavigationMapper.insert(entity);
+        return toDetail(entity);
+    }
+
+    @Override
+    @Transactional
+    /**
+     * 更新导航。
+     *
+     * <p>更新时会阻止把自己设为父节点或挂到自己的后代节点下。
+     */
+    public NavigationDetailView update(String id, String parentId, String name, String type, String routePath, String componentPath, String externalUrl, String icon, Integer sortOrder, Boolean visible, Integer status) {
+        Long navigationId = parseId(id, "导航不存在");
+        NavigationEntity entity = require(navigationId);
+        NavigationEntity parent = parentId == null || parentId.isBlank() ? null : require(parseId(parentId, "上级导航不存在"));
+        validatePayload(parent, type, routePath, componentPath, externalUrl, sortOrder, visible, status);
+        if (parent != null && parent.getId().equals(entity.getId())) {
+            throw new BusinessException(400, "上级导航不能选择自己");
+        }
+        if (parent != null) {
+            ensureNotDescendant(parent.getId(), entity.getId());
+        }
+        entity.setUpdatedAt(LocalDateTime.now());
+        fill(entity, parent, name, type, routePath, componentPath, externalUrl, icon, sortOrder, visible, status);
+        uiNavigationMapper.update(entity);
+        return toDetail(entity);
+    }
+
+    @Override
+    @Transactional
+    /**
+     * 删除导航。
+     *
+     * <p>仅允许删除没有子导航的节点，并同步清理导航权限关联。
+     */
+    public void delete(String id) {
+        Long navigationId = parseId(id, "导航不存在");
+        NavigationEntity entity = require(navigationId);
+        long childCount = uiNavigationMapper.selectCountByQuery(
+                QueryWrapper.create()
+                        .where("parent_id = {0}", navigationId)
+                        .and("deleted = false")
+        );
+        if (childCount > 0) {
+            throw new BusinessException(400, "存在子导航，不能删除");
+        }
+        entity.setDeleted(true);
+        entity.setUpdatedAt(LocalDateTime.now());
+        uiNavigationMapper.update(entity);
+        uiNavigationPermissionMapper.deleteByQuery(
+                QueryWrapper.create().where("navigation_id = {0}", navigationId)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    /**
+     * 查询导航权限列表。
+     */
+    public List<RolePermissionItem> permissions(String id) {
+        Long navigationId = parseId(id, "导航不存在");
+        require(navigationId);
+        Map<Long, PermissionEntity> permissionMap = iamPermissionMapper.selectAll().stream()
+                .filter(item -> !Boolean.TRUE.equals(item.getDeleted()))
+                .collect(Collectors.toMap(PermissionEntity::getId, item -> item, (left, right) -> left));
+        return uiNavigationPermissionMapper.selectListByQuery(
+                QueryWrapper.create().where("navigation_id = {0}", navigationId)
+        ).stream()
+                .map(binding -> permissionMap.get(binding.getPermissionId()))
+                .filter(Objects::nonNull)
+                .map(item -> new RolePermissionItem(item.getPermissionCode(), item.getPermissionName(), item.getPermissionType(), item.getModuleCode()))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    /**
+     * 分配导航权限。
+     *
+     * <p>会以传入权限编码集合为准，先清旧再建新。
+     */
+    public void assignPermissions(String id, List<String> permissionCodes) {
+        Long navigationId = parseId(id, "导航不存在");
+        require(navigationId);
+        List<String> requested = permissionCodes == null ? List.of() : permissionCodes.stream().filter(Objects::nonNull).map(String::trim).filter(code -> !code.isEmpty()).distinct().toList();
+        Map<String, PermissionEntity> permissionMap = iamPermissionMapper.selectAll().stream()
+                .filter(item -> !Boolean.TRUE.equals(item.getDeleted()))
+                .collect(Collectors.toMap(PermissionEntity::getPermissionCode, item -> item, (left, right) -> left));
+        requested.forEach(code -> {
+            if (!permissionMap.containsKey(code)) {
+                throw new BusinessException(400, "权限不存在: " + code);
+            }
+        });
+        uiNavigationPermissionMapper.deleteByQuery(
+                QueryWrapper.create().where("navigation_id = {0}", navigationId)
+        );
+        List<NavigationPermissionEntity> bindings = new ArrayList<>();
+        for (String code : requested) {
+            NavigationPermissionEntity entity = new NavigationPermissionEntity();
+            entity.setId(idGenerator.nextId());
+            entity.setNavigationId(navigationId);
+            entity.setPermissionId(permissionMap.get(code).getId());
+            entity.setCreatedAt(LocalDateTime.now());
+            bindings.add(entity);
+        }
+        uiNavigationPermissionMapper.insertBatch(bindings);
+    }
+
+    /**
+     * 填充导航实体字段。
+     */
+    private void fill(NavigationEntity entity, NavigationEntity parent, String name, String type, String routePath, String componentPath, String externalUrl, String icon, Integer sortOrder, Boolean visible, Integer status) {
+        String normalizedType = type == null ? null : type.trim().toUpperCase();
+        entity.setParentId(parent == null ? null : parent.getId());
+        entity.setNavName(name == null ? null : name.trim());
+        entity.setNavCode(buildNavCode(parent, routePath, name));
+        entity.setNavType(normalizedType);
+        entity.setRoutePath(resolveStoredRoutePath(normalizedType, routePath));
+        entity.setComponentPath(resolveStoredComponentPath(normalizedType, componentPath));
+        entity.setExternalUrl(trimToNull(externalUrl));
+        entity.setIcon(trimToNull(icon));
+        entity.setVisibleFlag(Boolean.TRUE.equals(visible));
+        entity.setSortOrder(sortOrder);
+        entity.setStatus(normalizeStatus(status));
+    }
+
+    /**
+     * 生成导航编码。
+     */
+    private String buildNavCode(NavigationEntity parent, String routePath, String name) {
+        String source = trimToNull(routePath);
+        if (source == null) {
+            source = trimToNull(name);
+        }
+        if (source == null) {
+            return "nav_" + idGenerator.nextId();
+        }
+        String normalized = source.replace('/', '_').replace('-', '_').replaceAll("_+", "_").replaceAll("[^A-Za-z0-9_]", "");
+        if (normalized.startsWith("_")) {
+            normalized = normalized.substring(1);
+        }
+        if (normalized.isBlank()) {
+            normalized = "nav";
+        }
+        return normalized.toLowerCase();
+    }
+
+    /**
+     * 校验导航请求参数。
+     */
+    private void validatePayload(NavigationEntity parent, String type, String routePath, String componentPath, String externalUrl, Integer sortOrder, Boolean visible, Integer status) {
+        String normalizedType = type == null ? "" : type.trim().toUpperCase();
+        if (!List.of("GROUP", "PAGE", "LINK").contains(normalizedType)) {
+            throw new BusinessException(400, "导航类型不支持");
+        }
+        if (sortOrder == null || sortOrder < 1) {
+            throw new BusinessException(400, "排序号不能为空");
+        }
+        if (visible == null) {
+            throw new BusinessException(400, "是否显示不能为空");
+        }
+        if (!Objects.equals(status, 1) && !Objects.equals(status, 0)) {
+            throw new BusinessException(400, "状态只支持 0 或 1");
+        }
+        if (parent != null && "LINK".equalsIgnoreCase(parent.getNavType())) {
+            throw new BusinessException(400, "外链节点下不能新增子节点");
+        }
+        if ("GROUP".equals(normalizedType)) {
+            return;
+        }
+        if (trimToNull(routePath) == null) {
+            throw new BusinessException(400, "路由路径不能为空");
+        }
+        if ("PAGE".equals(normalizedType) && trimToNull(componentPath) == null) {
+            throw new BusinessException(400, "组件路径不能为空");
+        }
+        if ("LINK".equals(normalizedType) && trimToNull(externalUrl) == null) {
+            throw new BusinessException(400, "外链地址不能为空");
+        }
+    }
+
+    private String resolveStoredRoutePath(String type, String routePath) {
+        String normalizedRoutePath = trimToNull(routePath);
+        return normalizedRoutePath == null ? "" : normalizedRoutePath;
+    }
+
+    private String resolveStoredComponentPath(String type, String componentPath) {
+        String normalizedComponentPath = trimToNull(componentPath);
+        if (normalizedComponentPath != null) {
+            return normalizedComponentPath;
+        }
+        return "PAGE".equals(type) ? "" : "";
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    /**
+     * 校验父节点不是当前节点后代。
+     */
+    private void ensureNotDescendant(Long parentId, Long id) {
+        Long current = parentId;
+        while (current != null) {
+            if (current.equals(id)) {
+                throw new BusinessException(400, "上级导航不能选择当前节点的下级节点");
+            }
+            NavigationEntity entity = uiNavigationMapper.selectOneByQuery(
+                    QueryWrapper.create()
+                            .where("id = {0}", current)
+                            .and("deleted = false")
+            );
+            current = entity == null ? null : entity.getParentId();
+        }
+    }
+
+    /**
+     * 加载导航实体，不存在则抛异常。
+     */
+    private NavigationEntity require(Long id) {
+        NavigationEntity entity = uiNavigationMapper.selectOneByQuery(
+                QueryWrapper.create()
+                        .where("id = {0}", id)
+                        .and("deleted = false")
+        );
+        if (entity == null) {
+            throw new BusinessException(404, "导航不存在");
+        }
+        return entity;
+    }
+
+    /**
+     * 转换为导航树节点。
+     */
+    private NavigationTreeItem toTree(NavigationEntity entity, Map<Long, List<NavigationEntity>> childrenMap) {
+        return new NavigationTreeItem(
+                String.valueOf(entity.getId()),
+                entity.getParentId() == null ? null : String.valueOf(entity.getParentId()),
+                entity.getNavName(),
+                entity.getNavType(),
+                blankToNull(entity.getRoutePath()),
+                blankToNull(entity.getComponentPath()),
+                blankToNull(entity.getExternalUrl()),
+                entity.getIcon(),
+                entity.getSortOrder(),
+                entity.getVisibleFlag(),
+                toNumericStatus(entity.getStatus()),
+                childrenMap.getOrDefault(entity.getId(), List.of()).stream().map(child -> toTree(child, childrenMap)).toList()
+        );
+    }
+
+    /**
+     * 转换为导航详情视图。
+     */
+    private NavigationDetailView toDetail(NavigationEntity entity) {
+        NavigationEntity parent = entity.getParentId() == null ? null : uiNavigationMapper.selectOneByQuery(
+                QueryWrapper.create()
+                        .where("id = {0}", entity.getParentId())
+                        .and("deleted = false")
+        );
+        return new NavigationDetailView(
+                String.valueOf(entity.getId()),
+                entity.getParentId() == null ? null : String.valueOf(entity.getParentId()),
+                parent == null ? null : parent.getNavName(),
+                entity.getNavName(),
+                entity.getNavType(),
+                blankToNull(entity.getRoutePath()),
+                blankToNull(entity.getComponentPath()),
+                blankToNull(entity.getExternalUrl()),
+                entity.getIcon(),
+                entity.getSortOrder(),
+                entity.getVisibleFlag(),
+                toNumericStatus(entity.getStatus())
+        );
+    }
+}

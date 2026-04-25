@@ -1,0 +1,64 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/upms?serverTimezone=Asia/Shanghai&characterSetResults=utf8
+    username: root
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+  redis:
+    redisson:
+      config: |
+        singleServerConfig:
+          idleConnectionTimeout: 10000
+          connectTimeout: 10000
+          timeout: 3000
+          retryAttempts: 4
+          retryDelay: !<org.redisson.config.EqualJitterDelay> {baseDelay: PT1S, maxDelay: PT2S}
+          reconnectionDelay: !<org.redisson.config.EqualJitterDelay> {baseDelay: PT0.1S, maxDelay: PT10S}
+          subscriptionsPerConnection: 5
+          clientName: null
+          address: "redis://127.0.0.1:6379"
+          subscriptionConnectionMinimumIdleSize: 1
+          subscriptionConnectionPoolSize: 50
+          connectionMinimumIdleSize: 24
+          connectionPoolSize: 64
+          database: 0
+          dnsMonitoringInterval: 5000
+        password: null
+        username: null
+        threads: 16
+        nettyThreads: 32
+        codec: !<org.redisson.codec.Kryo5Codec> {}
+        transportMode: "NIO"
+  
+  sql:
+    init:
+      mode: always
+      schema-locations:
+        - classpath:db/mysql/001_auth_schema.sql
+        - classpath:db/mysql/003_audit_schema.sql
+        - classpath:db/mysql/005_operation_audit_schema.sql
+        - classpath:db/mysql/007_file_schema.sql
+        - classpath:db/mysql/009_announcement_schema.sql
+        - classpath:db/mysql/011_org_rbac_schema.sql
+        - classpath:db/mysql/012_navigation_meta_schema.sql
+      data-locations:
+        - classpath:db/mysql/002_auth_seed.sql
+        - classpath:db/mysql/004_audit_seed.sql
+        - classpath:db/mysql/006_operation_audit_seed.sql
+        - classpath:db/mysql/008_file_seed.sql
+        - classpath:db/mysql/010_announcement_seed.sql
+        - classpath:db/mysql/013_platform_seed.sql

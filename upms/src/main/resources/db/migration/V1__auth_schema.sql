@@ -1,0 +1,101 @@
+CREATE TABLE IF NOT EXISTS `iam_user` (
+  `id` BIGINT NOT NULL COMMENT '主键',
+  `user_code` VARCHAR(64) NOT NULL COMMENT '用户编码',
+  `display_name` VARCHAR(64) NOT NULL COMMENT '展示姓名',
+  `gender` VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN' COMMENT '性别',
+  `employee_no` VARCHAR(64) NULL COMMENT '工号',
+  `avatar_file_id` BIGINT NULL COMMENT '头像文件ID',
+  `user_type` VARCHAR(32) NOT NULL COMMENT '用户类型',
+  `source_type` VARCHAR(32) NOT NULL COMMENT '来源类型',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+  `password_reset_required` TINYINT NOT NULL DEFAULT 0 COMMENT '是否首次登录必须改密',
+  `last_login_time` DATETIME(3) NULL COMMENT '最近登录时间',
+  `last_login_ip` VARCHAR(64) NULL COMMENT '最近登录IP',
+  `remark` VARCHAR(500) NULL COMMENT '备注',
+  `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `creator_id` BIGINT NULL COMMENT '创建人ID',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  `updater_id` BIGINT NULL COMMENT '更新人ID',
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_iam_user_user_code` (`user_code`),
+  UNIQUE KEY `uk_iam_user_employee_no` (`employee_no`),
+  KEY `idx_iam_user_status` (`status`),
+  KEY `idx_iam_user_deleted` (`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='平台用户主表';
+
+CREATE TABLE IF NOT EXISTS `iam_account` (
+  `id` BIGINT NOT NULL COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `account_type` VARCHAR(32) NOT NULL COMMENT '账号类型',
+  `identifier` VARCHAR(128) NOT NULL COMMENT '原始标识值',
+  `normalized_identifier` VARCHAR(128) NOT NULL COMMENT '归一化标识值',
+  `is_login_enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '是否允许登录',
+  `is_primary` TINYINT NOT NULL DEFAULT 0 COMMENT '是否主账号',
+  `verified_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已验证',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+  `last_used_time` DATETIME(3) NULL COMMENT '最近使用时间',
+  `creator_id` BIGINT NULL COMMENT '创建人ID',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  `updater_id` BIGINT NULL COMMENT '更新人ID',
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_iam_account_type_identifier` (`account_type`, `normalized_identifier`),
+  KEY `idx_iam_account_user_id` (`user_id`),
+  KEY `idx_iam_account_user_primary` (`user_id`, `is_primary`),
+  KEY `idx_iam_account_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='账号标识表';
+
+CREATE TABLE IF NOT EXISTS `auth_password_credential` (
+  `id` BIGINT NOT NULL COMMENT '主键',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `password_hash` VARCHAR(255) NOT NULL COMMENT '密码摘要',
+  `password_algo` VARCHAR(64) NOT NULL COMMENT '密码算法',
+  `password_changed_time` DATETIME(3) NULL COMMENT '最近改密时间',
+  `temporary_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否临时密码',
+  `failed_count` INT NOT NULL DEFAULT 0 COMMENT '连续失败次数',
+  `locked_until` DATETIME(3) NULL COMMENT '锁定截止时间',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_auth_password_credential_user_id` (`user_id`),
+  KEY `idx_auth_password_credential_locked_until` (`locked_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='密码凭证表';
+
+CREATE TABLE IF NOT EXISTS `auth_session` (
+  `id` BIGINT NOT NULL COMMENT '主键',
+  `session_key` VARCHAR(128) NOT NULL COMMENT '会话标识或哈希值',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `client_type` VARCHAR(32) NOT NULL COMMENT '客户端类型',
+  `auth_type` VARCHAR(32) NOT NULL COMMENT '登录方式',
+  `ip` VARCHAR(64) NULL COMMENT '登录IP',
+  `user_agent` VARCHAR(500) NULL COMMENT '终端信息',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'ONLINE' COMMENT '会话状态',
+  `login_time` DATETIME(3) NOT NULL COMMENT '登录时间',
+  `last_access_time` DATETIME(3) NULL COMMENT '最近访问时间',
+  `expire_time` DATETIME(3) NOT NULL COMMENT '过期时间',
+  `offline_time` DATETIME(3) NULL COMMENT '下线时间',
+  `offline_reason` VARCHAR(128) NULL COMMENT '下线原因',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_auth_session_session_key` (`session_key`),
+  KEY `idx_auth_session_user_id` (`user_id`),
+  KEY `idx_auth_session_status` (`status`),
+  KEY `idx_auth_session_expire_time` (`expire_time`),
+  KEY `idx_auth_session_user_status` (`user_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='在线会话表';
+
+CREATE TABLE IF NOT EXISTS `auth_verification_code` (
+  `id` BIGINT NOT NULL COMMENT '主键',
+  `target_type` VARCHAR(32) NOT NULL COMMENT '目标类型',
+  `target_value` VARCHAR(128) NOT NULL COMMENT '目标值',
+  `scene` VARCHAR(32) NOT NULL COMMENT '业务场景',
+  `verification_code` VARCHAR(16) NOT NULL COMMENT '验证码',
+  `expire_time` DATETIME(3) NOT NULL COMMENT '过期时间',
+  `used_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已使用',
+  `used_time` DATETIME(3) NULL COMMENT '使用时间',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_auth_verification_code_target_scene` (`target_type`, `target_value`, `scene`),
+  KEY `idx_auth_verification_code_expire_time` (`expire_time`),
+  KEY `idx_auth_verification_code_used_flag` (`used_flag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='验证码表';
