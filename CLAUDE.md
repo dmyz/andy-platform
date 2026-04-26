@@ -2,6 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 语言要求
+
+- 所有对话使用中文。
+- 所有文档使用中文。
+- 所有代码注释使用中文。
+
+## 执行要求
+
+- 在生成说明、总结、计划、提交说明时，统一使用中文。
+- 在新增或修改 Markdown 文档时，统一使用中文。
+- 在新增或修改代码注释时，统一使用中文。
+
+## 开发规范
+
+- **必须**为所有函数/方法添加文档注释
+- **禁止**硬编码密钥、密码等敏感信息
+- **必须**处理所有异常，避免暴露堆栈信息
+- **建议**代码单行不超过 160 个字符
+
 ## 项目概述
 
 Andy Platform 是一个企业级统一权限管理系统（UPMS - Unified Permission Management System），采用前后端分离架构：
