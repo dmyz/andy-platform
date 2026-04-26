@@ -2,11 +2,11 @@
 
 ## 顶层分组
 
-- `net.upms.foundation.*`：技术基础设施与公共能力
-- `net.upms.system.*`：平台主数据与权限体系
-- `net.upms.support.*`：平台支撑能力
-- `net.upms.portal.*`：当前登录用户视角模块
-- `net.upms.biz.<domain>`：新增业务域
+- `net.junanw.upms.foundation.*`：技术基础设施与公共能力
+- `net.junanw.upms.system.*`：平台主数据与权限体系
+- `net.junanw.upms.support.*`：平台支撑能力
+- `net.junanw.upms.portal.*`：当前登录用户视角模块
+- `net.junanw.upms.biz.<domain>`：新增业务域
 
 ## 当前归类约定
 
@@ -24,7 +24,7 @@
 
 ## 新增业务默认归位
 
-新增业务模块统一放在 `net.upms.biz.<domain>`，不要直接平铺到 `net.upms` 顶层。
+新增业务模块统一放在 `net.junanw.upms.biz.<domain>`，不要直接平铺到 `net.junanw.upms` 顶层。
 
 只有以下场景继续使用平台顶层分组，而不是 `biz`：
 
@@ -70,6 +70,6 @@
 - `controller` 只依赖本模块或其他模块的 `service`
 - 禁止直接依赖其他模块的 `repository`
 - 禁止直接依赖其他模块的 `entity`
-- 通用技术能力放 `net.upms.foundation.shared`
-- 全局配置放 `net.upms.foundation.platform`
+- 通用技术能力放 `net.junanw.upms.foundation.shared`
+- 全局配置放 `net.junanw.upms.foundation.platform`
 - 会话、安全、审计等基础设施优先复用 `foundation.platform`

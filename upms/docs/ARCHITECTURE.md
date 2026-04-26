@@ -2,18 +2,18 @@
 
 ## 顶层分组
 
-后端代码以 `net.upms` 为根包，并按职责分为 5 层：
+后端代码以 `net.junanw.upms` 为根包，并按职责分为 5 层：
 
-- `net.upms.foundation.*`：技术基础设施与公共能力
-- `net.upms.system.*`：平台主数据、权限与系统配置
-- `net.upms.support.*`：平台支撑能力
-- `net.upms.portal.*`：当前登录用户视角模块
-- `net.upms.biz.<domain>`：未来业务扩展域
+- `net.junanw.upms.foundation.*`：技术基础设施与公共能力
+- `net.junanw.upms.system.*`：平台主数据、权限与系统配置
+- `net.junanw.upms.support.*`：平台支撑能力
+- `net.junanw.upms.portal.*`：当前登录用户视角模块
+- `net.junanw.upms.biz.<domain>`：未来业务扩展域
 
 当前顶层源码树如下：
 
 ```text
-net.upms
+net.junanw.upms
 ├── foundation
 ├── system
 ├── support
@@ -92,7 +92,7 @@ net.upms
 
 ## 扩展建议
 
-新增业务统一进入 `net.upms.biz.<domain>`。
+新增业务统一进入 `net.junanw.upms.biz.<domain>`。
 
 新增平台支撑能力时，优先挂在现有支撑域下扩展，例如：
 
