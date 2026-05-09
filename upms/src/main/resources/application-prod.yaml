@@ -4,15 +4,6 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/upms?serverTimezone=Asia/Shanghai&characterSetResults=utf8
     username: root
     password: ${DB_PASSWORD}
-  jpa:
-    hibernate:
-      ddl-auto: none
-    open-in-view: false
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
   data:
     redis:
       repositories:
@@ -43,7 +34,7 @@ spring:
         nettyThreads: 32
         codec: !<org.redisson.codec.Kryo5Codec> {}
         transportMode: "NIO"
-  
+
   sql:
     init:
       mode: always

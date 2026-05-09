@@ -2,7 +2,7 @@ import path from 'node:path'
 import { cwd } from 'node:process'
 
 import tailwindcss from '@tailwindcss/vite'
-import { TDesignResolver } from '@tdesign-vue-next/auto-import-resolver'
+import { AntdvNextResolver } from '@antdv-next/auto-import-resolver'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -25,20 +25,15 @@ export default defineConfig(({ mode }) => {
         'pinia',
       ],
       dts: true,
-      resolvers: [
-        TDesignResolver({
-          library: 'vue-next',
-        }),
-      ],
     }),
     Components({
       dirs: ['src/components'],
       extensions: ['ui/**', 'layout/**'],
       dts: true,
-      resolvers: [TDesignResolver({
-        library: 'vue-next',
-      })],
-    }),
+      resolvers: [
+        AntdvNextResolver(),
+      ],
+    })
   ]
 
   return {

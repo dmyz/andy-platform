@@ -1,0 +1,4 @@
+interface:
+  display_name: "start-watch-fix"
+  short_description: "启动 UPMS 后端、监听日志并协调修复后重启"
+  default_prompt: "Use $start-watch-fix to start the UPMS backend, watch logs, delegate fixes for errors, then restart and report."

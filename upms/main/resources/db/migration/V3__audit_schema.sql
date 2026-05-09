@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `audit_login_event` (
+  `id` bigint NOT NULL,
+  `user_id` bigint DEFAULT NULL,
+  `account_identifier` varchar(128) NOT NULL,
+  `auth_type` varchar(32) NOT NULL,
+  `event_type` varchar(32) NOT NULL,
+  `success_flag` tinyint NOT NULL,
+  `reason_code` varchar(64) DEFAULT NULL,
+  `ip` varchar(64) DEFAULT NULL,
+  `user_agent` varchar(500) DEFAULT NULL,
+  `session_key` varchar(128) DEFAULT NULL,
+  `trace_id` varchar(64) DEFAULT NULL,
+  `request_id` varchar(64) DEFAULT NULL,
+  `event_time` datetime(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_login_event_user_id` (`user_id`),
+  KEY `idx_audit_login_event_event_time` (`event_time`),
+  KEY `idx_audit_login_event_event_type` (`event_type`),
+  KEY `idx_audit_login_event_success_flag` (`success_flag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
